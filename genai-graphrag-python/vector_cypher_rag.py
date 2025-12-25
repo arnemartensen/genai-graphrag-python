@@ -21,8 +21,39 @@ driver = GraphDatabase.driver(
 embedder = OpenAIEmbeddings(model="text-embedding-ada-002")
 
 # Define retrieval query
+# retrieval_query = """
+# RETURN node.text as text, score
+# """
+
+# retrieval_query = """
+# MATCH (node)-[:FROM_DOCUMENT]->(d)-[:PDF_OF]->(lesson)
+# RETURN DISTINCT
+#     node.text as text, score,
+#     lesson.url as lesson_url,
+#     collect { MATCH (node)<-[:FROM_CHUNK]-(e:Technology) RETURN e.name } as technologies,
+#     collect { MATCH (node)<-[:FROM_CHUNK]-(e:Concept) RETURN e.name } as concepts
+# """
+
 retrieval_query = """
-RETURN node.text as text, score
+MATCH (node)-[:FROM_DOCUMENT]->(d)-[:PDF_OF]->(lesson)
+RETURN
+    node.text as text, score,
+    lesson.url as lesson_url,
+    collect { 
+        MATCH (node)<-[:FROM_CHUNK]-(entity)-[r]->(other)-[:FROM_CHUNK]->()
+        WITH toStringList([
+            labels(entity)[2], 
+            entity.name, 
+            entity.type, 
+            entity.description, 
+            type(r), 
+            labels(other)[2], 
+            other.name, 
+            other.type, 
+            other.description
+            ]) as values
+        RETURN reduce(acc = "", item in values | acc || coalesce(item || ' ', ''))
+    } as associated_entities
 """
 
 # Create retriever
@@ -35,13 +66,13 @@ retriever = VectorCypherRetriever(
 )
 
 #  Create the LLM
-llm = OpenAILLM(model_name="gpt-4o")
+llm = OpenAILLM(model_name="gpt-4o-mini")
 
 # Create GraphRAG pipeline
 rag = GraphRAG(retriever=retriever, llm=llm)
 
 # Search
-query_text = "Where can I learn more about knowledge graphs?"
+query_text = "Where can I learn more about knowledge graphs"
 
 response = rag.search(
     query_text=query_text, 
@@ -50,6 +81,7 @@ response = rag.search(
 )
 
 print(response.answer)
+# print("CONTEXT:", response.retriever_result.items)
 
 # Close the database connection
 driver.close()

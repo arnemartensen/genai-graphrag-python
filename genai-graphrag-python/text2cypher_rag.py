@@ -15,9 +15,9 @@ driver = GraphDatabase.driver(
         os.getenv("NEO4J_PASSWORD")
     )
 )
-
+ 
 llm = OpenAILLM(
-    model_name="gpt-4o", 
+    model_name="gpt-4o-mini", 
     model_params={"temperature": 0}
 )
 
@@ -39,7 +39,7 @@ rag = GraphRAG(
     llm=llm
 )
 
-query_text = "How many technologies are mentioned in the knowledge graph?"
+query_text = "Please list all technologies in this knowledge graph and please to not miss any of them. Also do not group them. Just list and count them."
 
 response = rag.search(
     query_text=query_text,
@@ -47,7 +47,9 @@ response = rag.search(
     )
 
 print(response.answer)
+print("---")
 print("CYPHER :", response.retriever_result.metadata["cypher"])
+print("---")
 print("CONTEXT:", response.retriever_result.items)
 
 driver.close()
